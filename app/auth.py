@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from . import models, schemas
 from .database import get_db
@@ -36,6 +37,18 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 def get_user(db: Session, email: str) -> models.User | None:
     return db.query(models.User).filter(models.User.email == email).first()
+
+def authenticate_user(db: Session, identifier: str, password: str) -> models.User | None:
+    user = db.query(models.User).filter(
+        or_(models.User.email == identifier, models.User.username == identifier)
+    ).first()
+    
+    if not user:
+        return None
+    if not verify_password(password, user.hashed_password):
+        return None
+        
+    return user
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Session = Depends(get_db)) -> models.User:
     credentials_exception = HTTPException(
